@@ -104,7 +104,7 @@ function mission_end(_won)
     play(_won ? "win" : "lose");
     if (_won)
     {
-        ini_open("embersand.ini");
+        ini_open("balance.ini");
         ini_write_real("progress", "m" + string(global.mission_index), 1);
         ini_close();
         global.done[global.mission_index] = true;
@@ -540,8 +540,8 @@ function select_box(_x1, _y1, _x2, _y2, _shift)
     else global.sel_one = noone;
 }
 
-// ---------- Self-test (only when the environment variable EMBERSAND_TEST is set) ----------
-// Plays mission EMBERSAND_TEST (1-3) on its own at high speed, saving screenshots and a log next to the game, then quits.
+// ---------- Self-test (only when the environment variable BALANCE_TEST is set) ----------
+// Plays mission BALANCE_TEST (1-3) on its own at high speed, saving screenshots and a log next to the game, then quits.
 
 function autotest_place(_type)
 {

@@ -124,9 +124,9 @@ function ui_title()
     draw_set_halign(fa_center);
     draw_set_colour(c_black);
     draw_set_alpha(0.6);
-    draw_text(646, 66, "EMBERSAND");
+    draw_text(646, 66, "BALANCE");
     draw_set_alpha(1);
-    draw_text_colour(640, 60, "EMBERSAND", make_colour_rgb(255, 236, 170), make_colour_rgb(255, 236, 170), make_colour_rgb(240, 120, 40), make_colour_rgb(240, 120, 40), 1);
+    draw_text_colour(640, 60, "BALANCE", make_colour_rgb(255, 236, 170), make_colour_rgb(255, 236, 170), make_colour_rgb(240, 120, 40), make_colour_rgb(240, 120, 40), 1);
     draw_set_halign(fa_left);
     ui_text(640, 158, "A DESERT STRATEGY GAME", UI_TEXT, global.f_ui, fa_center);
 
@@ -560,7 +560,7 @@ function ui_end()
     }
     else if (ui_button(430, 520, 200, 44, "Try again")) { mission_start(global.mission_index); return; }
     if (ui_button(650, 520, 200, 44, "Title")) { mission_clear(); global.state = "title"; return; }
-    if (_won && _next >= array_length(global.missions)) ui_text(640, 470, "Embersand is yours, Commander.", UI_AMBER, global.f_ui, fa_center);
+    if (_won && _next >= array_length(global.missions)) ui_text(640, 470, "The sector is yours, Commander.", UI_AMBER, global.f_ui, fa_center);
 }
 
 function ui_cursor()

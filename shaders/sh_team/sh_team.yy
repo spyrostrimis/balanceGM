@@ -3,8 +3,8 @@
   "%Name":"sh_team",
   "name":"sh_team",
   "parent":{
-    "name":"snake_hangman7",
-    "path":"snake_hangman7.yyp",
+    "name":"Balance",
+    "path":"Balance.yyp",
   },
   "resourceType":"GMShader",
   "resourceVersion":"2.0",

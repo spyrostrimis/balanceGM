@@ -1,4 +1,4 @@
-/// Embersand: constants, unit and structure stats, sides and missions.
+/// Balance: constants, unit and structure stats, sides and missions.
 
 #macro CELL 32
 #macro HALF 16
@@ -45,9 +45,9 @@ function defs_init()
     global.veh_list = ["buggy", "tank", "launcher", "heavy", "harvester"];
 
     global.sides = [
-        { name: "Azure Concord",    short: "Concord",     col: make_colour_rgb(70, 132, 236) },
-        { name: "Jade Directorate", short: "Directorate", col: make_colour_rgb(64, 186, 96) },
-        { name: "Scarlet Dominion", short: "Dominion",    col: make_colour_rgb(214, 60, 48) }
+        { name: "Blue", short: "Blue",   col: make_colour_rgb(70, 132, 236) },
+        { name: "Green", short: "Green", col: make_colour_rgb(64, 186, 96) },
+        { name: "Red", short: "Red",     col: make_colour_rgb(214, 60, 48) }
     ];
     global.difficulties = ["Easy", "Normal", "Hard"];
 }
@@ -81,7 +81,7 @@ function missions_init()
                   mix: { trooper: 4, buggy: 2 },
                   first_wave: 210, wave_every: 140, wave: 3, wave_grow: 1, wave_max: 6, credits: 600 }
             ],
-            brief: "Welcome to Embersand, Commander. Up here it is all sand and black rock, but the lumen crystals under the dunes power half the colonies in this sector.\n\nBuild a Power Core, then a Refinery, and let the Harvester work. Collect 4,000 credits to secure our claim.\n\nThe Scarlet Dominion has a camp to the north-east. Expect raiders on buggies.",
+            brief: "Welcome to the dunes, Commander. Up here it is all sand and black rock, but the lumen crystals under the dunes power half the colonies in this sector.\n\nBuild a Power Core, then a Refinery, and let the Harvester work. Collect 4,000 credits to secure our claim.\n\nRed has a camp to the north-east. Expect raiders on buggies.",
             objective: "Collect 4,000 credits.",
             unlocks: "Rifle Squad, Dune Raider, Harvester, Gun Turret, Wall"
         },
@@ -98,7 +98,7 @@ function missions_init()
                   mix: { trooper: 3, rocketeer: 2, buggy: 2, tank: 4 },
                   first_wave: 240, wave_every: 150, wave: 4, wave_grow: 2, wave_max: 12, credits: 1500 }
             ],
-            brief: "The Dominion wants the ridge fields for itself. Their base sits across the valley, behind a line of turrets.\n\nOur engineers have finished the Radar Post, the Rocket Tower and the Warden tank. Build up, hold your fields, then go and take theirs.\n\nDestroy every Dominion structure.",
+            brief: "Red wants the ridge fields for itself. Their base sits across the valley, behind a line of turrets.\n\nOur engineers have finished the Radar Post, the Rocket Tower and the Warden tank. Build up, hold your fields, then go and take theirs.\n\nDestroy every Red structure.",
             objective: "Destroy all enemy structures.",
             unlocks: "Radar Post, Rocket Tower, Rocket Trooper, Warden Tank"
         },
@@ -121,7 +121,7 @@ function missions_init()
                   mix: { trooper: 3, rocketeer: 1, buggy: 3, tank: 3, launcher: 1 },
                   first_wave: 330, wave_every: 170, wave: 4, wave_grow: 2, wave_max: 12, credits: 1500 }
             ],
-            brief: "Ashfall. Two camps are closing in on us from the east: the Dominion, and the {other}, who have chosen this week to stop being our friends.\n\nThe labs have released the Lancer rocket carrier and the Bastion heavy tank. Use the Lancers from behind your tanks.\n\nBreak both bases, Commander. Then Embersand is ours.",
+            brief: "Ashfall. Two camps are closing in on us from the east: Red, and {other}, who have chosen this week to stop being our friends.\n\nThe labs have released the Lancer rocket carrier and the Bastion heavy tank. Use the Lancers from behind your tanks.\n\nBreak both bases, Commander. Then this sector is ours.",
             objective: "Destroy all structures of both enemy camps.",
             unlocks: "Lancer, Bastion"
         }

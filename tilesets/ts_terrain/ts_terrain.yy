@@ -12,8 +12,8 @@
   "out_tilehborder":0,
   "out_tilevborder":0,
   "parent":{
-    "name":"snake_hangman7",
-    "path":"snake_hangman7.yyp",
+    "name":"Balance",
+    "path":"Balance.yyp",
   },
   "resourceType":"GMTileSet",
   "resourceVersion":"2.0",

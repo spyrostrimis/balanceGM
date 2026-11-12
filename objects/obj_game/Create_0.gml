@@ -1,4 +1,5 @@
-/// Embersand: the controller. Owns the screens, the camera, the map and the sides.
+/// Balance: the controller. Owns the screens, the camera, the map and the sides.
+window_set_caption("Balance");
 defs_init();
 missions_init();
 fx_init();
@@ -42,7 +43,7 @@ global.sound_off = false;
 global.edge_scroll = true;
 global.speed_i = 1;
 global.done = array_create(array_length(global.missions), false);
-ini_open("embersand.ini");
+ini_open("balance.ini");
 for (var _m = 0; _m < array_length(global.missions); _m++) global.done[_m] = ini_read_real("progress", "m" + string(_m), 0) == 1;
 global.player_side = ini_read_real("settings", "side", 0);
 global.difficulty = ini_read_real("settings", "difficulty", 1);
@@ -107,14 +108,14 @@ global.ai_speed = 1;
 
 instance_create_depth(0, 0, 9000, obj_ground);
 
-var _test = environment_get_variable("EMBERSAND_TEST");
+var _test = environment_get_variable("BALANCE_TEST");
 global.autotest = _test != "";
 global.test_mission = global.autotest ? clamp(real(_test) - 1, 0, 2) : 0;
 global.test_t = 0;
 global.test_shot = -1;
-global.test_dir = environment_get_variable("EMBERSAND_TEST_DIR");
+global.test_dir = environment_get_variable("BALANCE_TEST_DIR");
 global.test_order = [];
 global.test_end = 0;
 global.test_pause_t = 0;
-global.test_frames = global.autotest ? real("0" + environment_get_variable("EMBERSAND_TEST_FRAMES")) : 0;
+global.test_frames = global.autotest ? real("0" + environment_get_variable("BALANCE_TEST_FRAMES")) : 0;
 if (global.test_frames <= 0) global.test_frames = 24000;

@@ -1,5 +1,5 @@
 mission_clear();
-ini_open("embersand.ini");
+ini_open("balance.ini");
 ini_write_real("settings", "side", global.player_side);
 ini_write_real("settings", "difficulty", global.difficulty);
 ini_close();

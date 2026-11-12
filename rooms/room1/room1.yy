@@ -17,8 +17,8 @@
   ],
   "name":"room1",
   "parent":{
-    "name":"snake_hangman7",
-    "path":"snake_hangman7.yyp",
+    "name":"Balance",
+    "path":"Balance.yyp",
   },
   "parentRoom":null,
   "physicsSettings":{

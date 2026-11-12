@@ -77,23 +77,23 @@ npx @gamemaker/gm-cli compile --errors-only
 npx @gamemaker/gm-cli run --errors-only
 ```
 
-# This project: Embersand (BalanceGM)
+# This project: Balance
 
-A real-time strategy game, the user's tribute to *Dune II* (their favourite game), in an
-original world. Moved here from `snake_hangman7/` in spyrostrimis/snake_hangman (its v7);
-the history of that folder came along. The GameMaker project is still named
-`snake_hangman7` (the `.yyp`, and the save folder `%LOCALAPPDATA%\snake_hangman7`) —
-renaming it needs the IDE or the resource tool, so leave it unless the user asks.
+A real-time strategy game made in GameMaker, the user's tribute to *Dune II* (their
+favourite game), in an original world. Project file `Balance.yyp`; save folder
+`%LOCALAPPDATA%\Balance`. Repo: spyrostrimis/balanceGM.
+
+**Story, factions and heroes: [docs/LORE.md](docs/LORE.md)** — read it before naming or
+writing anything in the game. Factions are provisionally Blue, Red, Green and the
+Palatinate/Clergy; names, insignia, units and mechanics are still open.
 
 Tools: GameMaker LTS runtime 2026.0.0.23, gm-cli 2.4.1
 (`npx @gamemaker/gm-cli compile|run|resourcetool script|manual read`).
 
 ## Where we are
 The game works (3 missions, 2 playable sides, 3 difficulties, AI that builds and attacks in
-waves), but the user judged it **mediocre: clunky, visuals dull and desaturated, a downgrade
-from Dune II's gameplay, looks and feel**. The next work is improving it, driven by the
-user playtesting. Likely causes: muddy code-drawn art with weak contrast, no unit
-animation, single-file grid movement, pacing never tuned by actual play.
+waves). The in-game sides are Blue and Green (playable) and Red (the enemy). The missions
+and units predate the lore and don't follow it yet.
 Don't take a feature for done because it compiles — ask the user to play it, and say
 exactly what to look for.
 
@@ -125,9 +125,9 @@ exactly what to look for.
   filtering. Pathing: `mp_grid`, separate vehicle and infantry grids (crags block vehicles).
 
 ## Self-test
-Set `EMBERSAND_TEST=1|2|3` (mission) and optionally `EMBERSAND_TEST_FRAMES=N` before
+Set `BALANCE_TEST=1|2|3` (mission) and optionally `BALANCE_TEST_FRAMES=N` before
 `gm-cli run`: the game plays that mission by itself at high speed, saves screenshots and a
-log to `%LOCALAPPDATA%\snake_hangman7`, then quits. Look at the screenshots — that's how to
+log to `%LOCALAPPDATA%\Balance`, then quits. Look at the screenshots — that's how to
 check visuals without the user.
 
 ## Art pipeline

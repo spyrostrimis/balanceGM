@@ -1,8 +1,8 @@
-// Draws all of Embersand's art (v7) and renders it to PNG with sharp.
+// Draws all of Balance's art and renders it to PNG with sharp.
 // Terrain tiles are drawn pixel by pixel; everything else is SVG.
 // Run: node art_src/make_art.js <sharp module dir> [output dir]
 // Writes <out>/<sprite>/<frame>.png and <out>/manifest.json (size and origin of each sprite).
-// Everything here is original art made for Embersand.
+// Everything here is original art made for Balance.
 const path = require("path");
 const fs = require("fs");
 const sharp = require(process.argv[2] || "sharp");
