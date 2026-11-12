@@ -76,3 +76,80 @@ To help users debug and play games you can make use of:
 npx @gamemaker/gm-cli compile --errors-only
 npx @gamemaker/gm-cli run --errors-only
 ```
+
+# This project: Embersand (BalanceGM)
+
+A real-time strategy game, the user's tribute to *Dune II* (their favourite game), in an
+original world. Moved here from `snake_hangman7/` in spyrostrimis/snake_hangman (its v7);
+the history of that folder came along. The GameMaker project is still named
+`snake_hangman7` (the `.yyp`, and the save folder `%LOCALAPPDATA%\snake_hangman7`) —
+renaming it needs the IDE or the resource tool, so leave it unless the user asks.
+
+Tools: GameMaker LTS runtime 2026.0.0.23, gm-cli 2.4.1
+(`npx @gamemaker/gm-cli compile|run|resourcetool script|manual read`).
+
+## Where we are
+The game works (3 missions, 2 playable sides, 3 difficulties, AI that builds and attacks in
+waves), but the user judged it **mediocre: clunky, visuals dull and desaturated, a downgrade
+from Dune II's gameplay, looks and feel**. The next work is improving it, driven by the
+user playtesting. Likely causes: muddy code-drawn art with weak contrast, no unit
+animation, single-file grid movement, pacing never tuned by actual play.
+Don't take a feature for done because it compiles — ask the user to play it, and say
+exactly what to look for.
+
+## Working rules (from the user)
+- Commit straight to `main`, no branches or pull requests unless asked.
+- Start the game for the user with `npx @gamemaker/gm-cli run` as a **background** command
+  while developing, so crash reports (`FATAL ERROR`, `ERROR in action`) reach you when the
+  process exits; then fix them.
+- Never inject mouse or keyboard input into the user's desktop (it once clicked into their
+  video player). Test with the self-test mode below instead.
+- Keep names, art and characters original; *Dune II* (Westwood/Electronic Arts) is the
+  inspiration only.
+
+## Code map
+- `scripts/scr_defs` — macros (CELL 32, GUI 1280×720, TOP_H 28, SIDE_X 1024, VIEW 512×346,
+  ZOOM 2, terrain types, LUMEN_MAX 300, PLAYER 0, DEPTH_BASE 5000), `global.udef` (unit
+  stats), `global.bdef` (building stats), `dmg_mod`, sides, missions.
+- `scr_map` (generation, tilemaps, shroud, `nearest_free_cell`), `scr_units` (paths,
+  `unit_step`, harvester state machine, `deal_damage`), `scr_buildings` (`can_place`,
+  `place_building`, turrets, sell), `scr_production`, `scr_ai`, `scr_game` (mission flow,
+  orders, input, self-test), `scr_ui` (title, briefing, sidebar, minimap, pause/end,
+  cursor, window-size buttons), `scr_fx`, `scr_sfx` (sound made in code).
+- Objects: `obj_game` (Create, Step, Draw, Draw GUI, Post Draw, CleanUp), `obj_unit`,
+  `obj_building`, `obj_proj`, `obj_ground`.
+- Display: the world draws into a 512×346 application surface, scaled up in Post Draw
+  (`global.view_s/view_ox/view_oy`); the GUI is laid out at 1280×720 with
+  `display_set_gui_maximise`. Team colours: shader `sh_team` swaps magenta for the side
+  colour. Shroud: a one-pixel-per-cell surface drawn with a multiply blend and linear
+  filtering. Pathing: `mp_grid`, separate vehicle and infantry grids (crags block vehicles).
+
+## Self-test
+Set `EMBERSAND_TEST=1|2|3` (mission) and optionally `EMBERSAND_TEST_FRAMES=N` before
+`gm-cli run`: the game plays that mission by itself at high speed, saves screenshots and a
+log to `%LOCALAPPDATA%\snake_hangman7`, then quits. Look at the screenshots — that's how to
+check visuals without the user.
+
+## Art pipeline
+Art is drawn in code: `art_src/make_art.js` (terrain pixel by pixel, the rest as SVG
+rendered with sharp) writes `art_src/png/<sprite>/<i>.png` + `manifest.json`.
+- `node art_src/make_art.js <path to sharp>` — sharp was found at
+  `C:/Users/PC/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/sharp`
+  (npx cache; reinstall if it's gone).
+- `node art_src/import_art.js --refresh [spr_...]` — copies new frames over existing
+  sprites and refreshes the tileset images (`tilesets/ts_*/output_tileset.png`); no `.yy`
+  changes.
+- `node art_src/import_art.js [spr_...] > import.txt` then
+  `npx @gamemaker/gm-cli resourcetool script import.txt` — creates new sprites.
+
+## Gotchas met so far
+- Tilesets created by the resource tool had `out_columns`/`tile_count` 0 and no output
+  image: set them with RESOURCE SET (borders 0) and copy the PNG to `output_tileset.png`.
+- A room's default Background layer hid the world — it was deleted.
+- `view_camera[0]` is set every step.
+- `resize_window` and `executable_name` options are read-only in the resource tool; the
+  user can turn on drag-resizing in the IDE (Game Options → Windows).
+- The file sandbox only allows writing in the save area; `screen_save` crops, so screenshots
+  are taken from a surface.
+- Instances can vanish between frames: check `instance_exists` before using a stored id
+  (two crashes came from this: cursor hover and selling).
