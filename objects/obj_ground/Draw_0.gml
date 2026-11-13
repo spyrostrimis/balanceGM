@@ -7,3 +7,4 @@ for (var _k = 0; _k < _n; _k++)
     if (!on_screen(_d.x, _d.y, 32)) continue;
     draw_sprite_ext(_d.spr, _d.img, _d.x, _d.y, _d.s, _d.s, _d.ang, c_white, _d.a);
 }
+claim_draw_world();

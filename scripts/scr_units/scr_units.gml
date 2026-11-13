@@ -109,7 +109,7 @@ function unit_separate()
     {
         var _o = _list[| _k];
         var _d = point_distance(x, y, _o.x, _o.y);
-        if (kind == "veh" && moving && _o.kind == "inf" && _o.team != team && _d < radius * 0.8)
+        if (kind == "veh" && moving && _o.kind == "inf" && hostile(_o.team, team) && _d < radius * 0.8)
         {
             play_at("crunch", _o.x, _o.y);
             unit_kill(_o, team);
@@ -169,7 +169,7 @@ function find_target(_px, _py, _team, _range, _min_range)
     var _best = noone, _bd = _range;
     with (obj_unit)
     {
-        if (team == _team) continue;
+        if (!hostile(team, _team)) continue;
         var _d = point_distance(x, y, _px, _py);
         if (_d < _bd && _d >= _min_range) { _bd = _d; _best = id; }
     }
@@ -177,7 +177,7 @@ function find_target(_px, _py, _team, _range, _min_range)
     var _wall = noone;
     with (obj_building)
     {
-        if (team == _team) continue;
+        if (!hostile(team, _team)) continue;
         var _d = bld_dist(id, _px, _py);
         if (_d >= _bd || _d < _min_range) continue;
         if (btype == "wall") { _wall = id; continue; }
@@ -536,7 +536,7 @@ function harvester_step()
 
 function deal_damage(_t, _amount, _weapon, _src_team, _src)
 {
-    if (!instance_exists(_t) || _t.team == _src_team) return;
+    if (!instance_exists(_t) || !hostile(_t.team, _src_team)) return;
     _t.hp -= _amount * dmg_mod(_weapon, _t.armor);
     _t.flash = 4;
     if (_t.hp <= 0)

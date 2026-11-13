@@ -128,13 +128,14 @@ function ui_title()
     draw_set_alpha(1);
     draw_text_colour(640, 60, "BALANCE", make_colour_rgb(255, 236, 170), make_colour_rgb(255, 236, 170), make_colour_rgb(240, 120, 40), make_colour_rgb(240, 120, 40), 1);
     draw_set_halign(fa_left);
-    ui_text(640, 158, "A DESERT STRATEGY GAME", UI_TEXT, global.f_ui, fa_center);
+    ui_text(640, 158, "A REAL-TIME STRATEGY GAME", UI_TEXT, global.f_ui, fa_center);
 
     ui_panel(420, 210, 860, 650, 0.9);
     ui_text(440, 224, "YOUR SIDE", UI_AMBER, global.f_small);
-    for (var _s = 0; _s < 2; _s++)
+    for (var _k = 0; _k < array_length(global.playable); _k++)
     {
-        var _bx = 440 + _s * 205;
+        var _s = global.playable[_k];
+        var _bx = 440 + _k * 205;
         if (ui_button(_bx, 244, 195, 40, global.sides[_s].name, true, global.player_side == _s)) global.player_side = _s;
         draw_set_colour(global.sides[_s].col);
         draw_rectangle(_bx + 6, 250, _bx + 14, 278, false);
@@ -146,10 +147,15 @@ function ui_title()
         if (ui_button(440 + _d * 137, 318, 127, 34, global.difficulties[_d], true, global.difficulty == _d)) global.difficulty = _d;
     }
     ui_text(440, 368, "MISSIONS", UI_AMBER, global.f_small);
+    var _num = 0;
     for (var _m = 0; _m < array_length(global.missions); _m++)
     {
-        var _lab = string(_m + 1) + ".  " + string_upper(global.missions[_m].title) + (global.done[_m] ? "   (done)" : "");
-        if (ui_button(440, 388 + _m * 54, 400, 44, _lab))
+        var _mm = global.missions[_m];
+        var _open = mission_open(_m);
+        var _lab = (_mm.campaign ? (string(++_num) + ".  ") : "SKIRMISH:  ") + string_upper(_mm.title);
+        if (!_open) _lab += "   (win " + global.missions[mission_index_of(_mm.needs)].title + ")";
+        else if (mission_won(_m, global.player_side)) _lab += "   (done)";
+        if (ui_button(440, 388 + _m * 54, 400, 44, _lab, _open))
         {
             global.brief_index = _m;
             global.brief_chars = 0;
@@ -169,8 +175,7 @@ function ui_title()
 
 function brief_text(_m)
 {
-    var _other = global.sides[1 - global.player_side].name;
-    return string_replace_all(_m.brief, "{other}", _other);
+    return string_replace_all(by_side(_m.brief), "{opponent}", global.sides[side_opponent(global.player_side)].name);
 }
 
 function ui_brief()
@@ -179,18 +184,18 @@ function ui_brief()
     draw_rectangle_colour(0, 0, GUI_W, GUI_H, make_colour_rgb(24, 20, 28), make_colour_rgb(24, 20, 28), make_colour_rgb(10, 8, 12), make_colour_rgb(10, 8, 12), false);
     ui_panel(30, 40, 290, 340);
     draw_sprite(spr_advisor, ((global.ui_t mod 190) < 7) ? 1 : 0, 40, 50);
-    ui_text(160, 300, "K-7  FIELD ADVISOR", UI_AMBER, global.f_small, fa_center);
+    ui_text(160, 300, by_side(_m.speaker), UI_AMBER, global.f_small, fa_center);
     ui_text(160, 318, "talking...", UI_DIM, global.f_small, fa_center, fa_top, (global.brief_chars < string_length(brief_text(_m))) ? 0.5 + 0.5 * sin(global.ui_t / 6) : 0);
     ui_panel(300, 40, 790, 320);
-    draw_sprite(spr_mission_pic, global.brief_index, 305, 45);
+    draw_sprite(spr_mission_pic, by_side(_m.pic), 305, 45);
     ui_panel(800, 40, 1250, 340);
-    ui_text(820, 54, "MISSION " + string(global.brief_index + 1), UI_AMBER, global.f_small);
+    ui_text(820, 54, _m.campaign ? ("MISSION " + string(global.brief_index + 1) + "  -  " + string_upper(global.sides[global.player_side].name) + " CAMPAIGN") : "SKIRMISH", UI_AMBER, global.f_small);
     ui_text(820, 72, string_upper(_m.title), UI_TEXT, global.f_big);
     ui_text(820, 118, "OBJECTIVE", UI_AMBER, global.f_small);
     draw_set_font(global.f_ui);
     draw_set_colour(UI_TEXT);
     draw_text_ext(820, 136, _m.objective, 22, 410);
-    ui_text(820, 196, "NEW EQUIPMENT", UI_AMBER, global.f_small);
+    ui_text(820, 196, _m.kit_title, UI_AMBER, global.f_small);
     draw_set_font(global.f_small);
     draw_set_colour(UI_TEXT);
     draw_text_ext(820, 214, _m.unlocks, 18, 410);
@@ -223,6 +228,7 @@ function minimap_update()
         surface_set_target(global.mm_base);
         draw_clear(c_black);
         var _sand = make_colour_rgb(206, 148, 90), _rock = make_colour_rgb(92, 82, 76), _crag = make_colour_rgb(58, 50, 46), _lum = make_colour_rgb(70, 210, 230);
+        if (global.look == "forest") { _sand = make_colour_rgb(70, 160, 58); _rock = make_colour_rgb(172, 98, 58); _crag = make_colour_rgb(18, 74, 30); }
         for (var _i = 0; _i < _w; _i++)
         {
             for (var _j = 0; _j < _h; _j++)
@@ -264,6 +270,7 @@ function ui_minimap()
     {
         minimap_update();
         if (surface_exists(global.mm_surf)) draw_surface_ext(global.mm_surf, _ox, _oy, _s, _s, 0, c_white, 1);
+        claim_draw_minimap(_ox, _oy, _s);
         draw_set_colour(c_white);
         draw_rectangle(_ox + global.cam_x / CELL * _s, _oy + global.cam_y / CELL * _s, _ox + (global.cam_x + VIEW_W) / CELL * _s, _oy + (global.cam_y + VIEW_H) / CELL * _s, true);
         if (ui_hover(MM_X, MM_Y, MM_S, MM_S))
@@ -312,6 +319,14 @@ function ui_sidebar()
     sel_clean();
     ui_panel(SIDE_X, TOP_H, GUI_W - 1, GUI_H - 1);
     ui_minimap();
+    if (!global.mission.build)
+    {
+        // No production in this mission: the objective takes the place of the build queues.
+        global.tip = "";
+        if (global.claim != undefined) claim_draw_sidebar();
+        ui_info();
+        return;
+    }
 
     // Tabs
     var _names = ["STRUCTURES", "INFANTRY", "VEHICLES"];
@@ -442,7 +457,7 @@ function ui_info()
             ui_bar(_x + 8, _y + 44, 160, 5, _e.cargo / HARV_CAP, make_colour_rgb(90, 230, 250));
             ui_text(_x + 176, _y + 39, string(floor(_e.cargo / HARV_CAP * 100)) + "% full", UI_DIM, global.f_small);
         }
-        if (_own && _e.object_index == obj_building)
+        if (_own && _e.object_index == obj_building && global.mission.build)
         {
             if (_e.btype == "barracks" || _e.btype == "factory") ui_text(_x + 8, _y + 50, "Right-click the map: rally point", UI_DIM, global.f_small);
             if (ui_button(_x + 8, _y + 70, 108, 30, _e.repairing ? "Repairing..." : "Repair", _e.hp < _e.maxhp, _e.repairing)) _e.repairing = !_e.repairing;
@@ -455,6 +470,7 @@ function ui_info()
             return;
         }
         if (_own && _e.object_index == obj_unit) ui_unit_buttons(_x, _y);
+        if (_own && _e.object_index == obj_building) ui_text(_x + 8, _y + 50, "No repairs or sales in this mission.", UI_DIM, global.f_small);
         return;
     }
     if (_n > 1)
@@ -492,10 +508,16 @@ function ui_topbar()
 {
     var _tm = global.teams[PLAYER];
     ui_panel(0, 0, GUI_W - 1, TOP_H - 1);
-    ui_text(10, 5, "CREDITS", UI_DIM, global.f_small);
-    var _s = fmt_num(_tm.shown);
-    if (global.mission.goal == "credits") _s += " / " + fmt_num(global.mission.goal_amount);
-    ui_text(70, 3, _s, UI_AMBER, global.f_ui);
+    if (global.mission.build)
+    {
+        ui_text(10, 5, "CREDITS", UI_DIM, global.f_small);
+        ui_text(70, 3, fmt_num(_tm.shown), UI_AMBER, global.f_ui);
+    }
+    else
+    {
+        ui_text(10, 5, "ARMY", UI_DIM, global.f_small);
+        ui_text(50, 3, string(_tm.units), UI_AMBER, global.f_ui);
+    }
     if (global.message_t > 0) ui_text(SIDE_X / 2 + 60, 4, global.message, UI_TEXT, global.f_ui, fa_center, fa_top, min(1, global.message_t / 30));
     var _pc = _tm.power_low ? make_colour_rgb(255, 90, 60) : make_colour_rgb(120, 220, 110);
     ui_text(SIDE_X + 8, 5, "POWER", UI_DIM, global.f_small);
@@ -525,7 +547,11 @@ function ui_pause()
     if (ui_button(490, 400, 300, 40, window_size_label())) window_next_size();
     if (ui_button(490, 450, 300, 40, "Restart mission")) { mission_start(global.mission_index); return; }
     if (ui_button(490, 500, 300, 40, "Quit to title")) { mission_clear(); global.paused = false; global.state = "title"; return; }
-    ui_text(640, 560, "Mission " + string(global.mission_index + 1) + ": " + global.mission.objective, UI_DIM, global.f_small, fa_center);
+    draw_set_font(global.f_small);
+    draw_set_colour(UI_DIM);
+    draw_set_halign(fa_center);
+    draw_text_ext(640, 556, global.mission.title + ": " + global.mission.objective, 16, 330);
+    draw_set_halign(fa_left);
 }
 
 function ui_end()
@@ -539,19 +565,20 @@ function ui_end()
     var _won = global.result == "win";
     ui_panel(400, 150, 880, 590);
     ui_text(640, 176, _won ? "MISSION ACCOMPLISHED" : "MISSION FAILED", _won ? UI_AMBER : make_colour_rgb(255, 90, 60), global.f_big, fa_center);
+    if (global.result_reason != "") ui_text(640, 212, global.result_reason, UI_TEXT, global.f_ui, fa_center);
     var _me = global.teams[PLAYER];
     var _rows = [
         ["Enemy units destroyed", _me.stats.killed],
         ["Units lost", _me.stats.lost],
         ["Enemy structures destroyed", _me.stats.bkilled],
         ["Structures lost", _me.stats.blost],
-        ["Lumen harvested", fmt_num(_me.harvested)],
+        global.mission.build ? ["Orichalcum harvested", fmt_num(_me.harvested)] : ["Units left", _me.units],
         ["Time", string(global.frame div 3600) + ":" + string_replace_all(string_format((global.frame div 60) mod 60, 2, 0), " ", "0")]
     ];
     for (var _k = 0; _k < array_length(_rows); _k++)
     {
-        ui_text(440, 240 + _k * 34, _rows[_k][0], UI_TEXT, global.f_ui);
-        ui_text(840, 240 + _k * 34, string(_rows[_k][1]), UI_AMBER, global.f_ui, fa_right);
+        ui_text(440, 250 + _k * 34, _rows[_k][0], UI_TEXT, global.f_ui);
+        ui_text(840, 250 + _k * 34, string(_rows[_k][1]), UI_AMBER, global.f_ui, fa_right);
     }
     var _next = global.mission_index + 1;
     if (_won && _next < array_length(global.missions))
@@ -576,7 +603,7 @@ function ui_cursor()
         {
             _f = 1;
             var _cx = cell_of(global.mouse_wx), _cy = cell_of(global.mouse_wy);
-            if (_h != noone && _h.team != PLAYER) _f = sel_has("combat") ? 2 : 4;
+            if (_h != noone && hostile(PLAYER, _h.team)) _f = sel_has("combat") ? 2 : 4;
             else if (_h != noone && _h.object_index == obj_unit && _h.team == PLAYER) _f = 0;
             else if (sel_has("harvester") && _h != noone && _h.object_index == obj_building && _h.btype == "refinery") _f = 3;
             else if (sel_has("harvester") && in_map(_cx, _cy) && global.lumen[# _cx, _cy] > 0) _f = 3;

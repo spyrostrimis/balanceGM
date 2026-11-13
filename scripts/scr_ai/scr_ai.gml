@@ -3,6 +3,7 @@
 function ai_create(_e, _diff)
 {
     return {
+        kind: "waves",
         order: _e.order, mix: _e.mix,
         wave: _e.wave + ((_diff == 2) ? 1 : 0), wave_grow: _e.wave_grow, wave_max: _e.wave_max + ((_diff == 2) ? 2 : 0),
         next_wave: global.frame + _e.first_wave * 60 * ((_diff == 0) ? 1.5 : ((_diff == 2) ? 0.8 : 1)),
@@ -16,16 +17,24 @@ function ai_create(_e, _diff)
     };
 }
 
-/// The cell of the player's main base (where waves and turrets point).
-function player_home()
+/// The home cell of the nearest enemy of team _t (where its waves and turrets point).
+function player_home(_t)
 {
-    return [global.mission.player.cx, global.mission.player.cy];
+    var _me = global.teams[_t], _best = [global.teams[PLAYER].home_cx, global.teams[PLAYER].home_cy], _bd = 999999;
+    for (var _k = 0; _k < array_length(global.teams); _k++)
+    {
+        if (!hostile(_t, _k)) continue;
+        var _o = global.teams[_k];
+        var _d = point_distance(_me.home_cx, _me.home_cy, _o.home_cx, _o.home_cy);
+        if (_d < _bd) { _bd = _d; _best = [_o.home_cx, _o.home_cy]; }
+    }
+    return _best;
 }
 
 function ai_set_rally(_t)
 {
     var _ai = global.teams[_t].ai;
-    var _ph = player_home();
+    var _ph = player_home(_t);
     var _dir = point_direction(_ai.home_x, _ai.home_y, _ph[0] * CELL, _ph[1] * CELL);
     var _c = nearest_free_cell(cell_of(_ai.home_x + lengthdir_x(6 * CELL, _dir)), cell_of(_ai.home_y + lengthdir_y(6 * CELL, _dir)), "veh", -1);
     _ai.rally_x = _c[0] * CELL + HALF;
@@ -51,7 +60,7 @@ function ai_place(_t, _type, _instant)
     var _ai = global.teams[_t].ai;
     var _d = global.bdef[$ _type];
     var _hx = cell_of(_ai.home_x), _hy = cell_of(_ai.home_y);
-    var _ph = player_home();
+    var _ph = player_home(_t);
     var _defence = (_type == "gun" || _type == "rocket");
     var _best = -1, _bs = 999999, _best_tight = -1, _bst = 999999;
     for (var _i = _hx - 11; _i <= _hx + 11; _i++)
@@ -109,7 +118,7 @@ function ai_attack_point(_t, _px, _py)
     var _best = noone, _bd = 9999999;
     with (obj_building)
     {
-        if (team != PLAYER || btype == "wall") continue;
+        if (!hostile(team, _t) || btype == "wall") continue;
         var _d = point_distance(_px, _py, x, y);
         if (_d < _bd) { _bd = _d; _best = id; }
     }
@@ -117,7 +126,7 @@ function ai_attack_point(_t, _px, _py)
     {
         with (obj_unit)
         {
-            if (team != PLAYER) continue;
+            if (!hostile(team, _t)) continue;
             var _d2 = point_distance(_px, _py, x, y);
             if (_d2 < _bd) { _bd = _d2; _best = id; }
         }

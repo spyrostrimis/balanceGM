@@ -10,10 +10,12 @@ function cell_of(_px)
     return floor(_px / CELL);
 }
 
+/// Is a cell drawn as rock (desert) or a laterite clearing (forest)? In the forest, thickets stand on grass.
 function is_rock(_cx, _cy)
 {
     _cx = clamp(_cx, 0, global.mw - 1);
     _cy = clamp(_cy, 0, global.mh - 1);
+    if (global.look == "forest") return global.terr[# _cx, _cy] == T_ROCK;
     return global.terr[# _cx, _cy] != T_SAND;
 }
 
@@ -66,7 +68,8 @@ function far_from(_cx, _cy, _points, _dist)
     return true;
 }
 
-function map_create(_m)
+/// Builds the map for mission _m. _bases is an array of {cx, cy}: where each force's base sits.
+function map_create(_m, _bases)
 {
     var _w = _m.w, _h = _m.h;
     global.mw = _w;
@@ -79,9 +82,14 @@ function map_create(_m)
     global.vents = [];
     global.lumen_claim = ds_map_create();
     random_set_seed(_m.seed);
-
-    var _bases = [_m.player];
-    for (var _k = 0; _k < array_length(_m.enemies); _k++) array_push(_bases, _m.enemies[_k]);
+    if (_m.layout == "duel")
+    {
+        map_gen_duel(_m);
+        randomize();
+        map_build_grids();
+        map_build_tiles();
+        return;
+    }
 
     // Base plateaus
     for (var _k = 0; _k < array_length(_bases); _k++) map_blob(_bases[_k].cx, _bases[_k].cy, 7.5, T_ROCK);
@@ -138,6 +146,130 @@ function map_create(_m)
     map_build_tiles();
 }
 
+// ---------- Duel maps (First Claim): small, turned half way round so both sides get the same ground ----------
+
+/// The cell that (_cx, _cy) maps to on the other half of a duel map.
+function duel_mirror_x(_cx) { return global.mw - 1 - _cx; }
+function duel_mirror_y(_cy) { return global.mh - 1 - _cy; }
+
+/// The top-left cell of a structure from base_plan, for slot 0 or slot 1.
+function duel_plan_cell(_plan_item, _slot)
+{
+    var _d = global.bdef[$ _plan_item[0]];
+    if (_slot == 0) return [_plan_item[1], _plan_item[2]];
+    return [global.mw - _plan_item[1] - _d.w, global.mh - _plan_item[2] - _d.h];
+}
+
+function duel_home(_m, _slot)
+{
+    if (_slot == 0) return [_m.home.cx, _m.home.cy];
+    return [duel_mirror_x(_m.home.cx), duel_mirror_y(_m.home.cy)];
+}
+
+/// Can a vehicle drive from (_ax, _ay) to (_bx, _by)? (A flood fill over the terrain.)
+function duel_connected(_ax, _ay, _bx, _by)
+{
+    var _seen = ds_grid_create(global.mw, global.mh);
+    ds_grid_clear(_seen, 0);
+    var _q = ds_queue_create();
+    ds_queue_enqueue(_q, [_ax, _ay]);
+    _seen[# _ax, _ay] = 1;
+    var _found = false;
+    var _nb = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    while (!ds_queue_empty(_q))
+    {
+        var _c = ds_queue_dequeue(_q);
+        if (_c[0] == _bx && _c[1] == _by) { _found = true; break; }
+        for (var _k = 0; _k < 4; _k++)
+        {
+            var _i = _c[0] + _nb[_k][0], _j = _c[1] + _nb[_k][1];
+            if (!in_map(_i, _j) || _seen[# _i, _j] || global.terr[# _i, _j] == T_CRAG) continue;
+            _seen[# _i, _j] = 1;
+            ds_queue_enqueue(_q, [_i, _j]);
+        }
+    }
+    ds_queue_destroy(_q);
+    ds_grid_destroy(_seen);
+    return _found;
+}
+
+/// The First Claim map: two base plateaus in opposite corners, thickets (crags) that make lanes,
+/// and one Orichalcum field in the middle. Everything is generated on one half and copied,
+/// turned half way round, onto the other.
+function map_gen_duel(_m)
+{
+    var _w = global.mw, _h = global.mh;
+    var _mx = (_w - 1) / 2, _my = (_h - 1) / 2;
+    var _zr = _m.zone.r;
+    var _home = duel_home(_m, 0);
+    var _ok = false;
+    for (var _try = 0; _try < 25 && !_ok; _try++)
+    {
+        ds_grid_clear(global.terr, T_SAND);
+        // The base plateau, and a couple of small clearings out on the flanks
+        map_blob(_home[0], _home[1], 6, T_ROCK);
+        repeat (2)
+        {
+            var _a = random(360), _d = random_range(8, 12);
+            var _px = round(_mx + lengthdir_x(_d, _a)), _py = round(_my + lengthdir_y(_d, _a));
+            if (point_distance(_px, _py, _home[0], _home[1]) > 8 && point_distance(_px, _py, _mx, _my) > _zr + 3) map_blob(_px, _py, random_range(1.6, 2.6), T_ROCK);
+        }
+        // Thickets: clumps and short lines of crag, kept off the bases and the zone
+        repeat (9)
+        {
+            var _tx = irandom_range(1, _w - 2), _ty = irandom_range(1, _h - 2);
+            var _len = irandom_range(1, 4), _dir = irandom(3) * 45;
+            for (var _s = 0; _s < _len; _s++)
+            {
+                var _cx = round(_tx + lengthdir_x(_s, _dir)), _cy = round(_ty + lengthdir_y(_s, _dir));
+                var _r = random_range(0.8, 1.7);
+                for (var _i = floor(_cx - _r); _i <= ceil(_cx + _r); _i++)
+                {
+                    for (var _j = floor(_cy - _r); _j <= ceil(_cy + _r); _j++)
+                    {
+                        if (!in_map(_i, _j) || point_distance(_i, _j, _cx, _cy) > _r) continue;
+                        if (point_distance(_i, _j, _mx, _my) < _zr + 2.5) continue;
+                        if (point_distance(_i, _j, _home[0], _home[1]) < 8.5 || point_distance(_i, _j, duel_mirror_x(_home[0]), duel_mirror_y(_home[1])) < 8.5) continue;
+                        global.terr[# _i, _j] = T_CRAG;
+                    }
+                }
+            }
+        }
+        // Copy the first half onto the second, turned half way round
+        for (var _i = 0; _i < _w; _i++)
+        {
+            for (var _j = 0; _j < _h; _j++)
+            {
+                if (_j * _w + _i < (_w * _h) div 2) global.terr[# duel_mirror_x(_i), duel_mirror_y(_j)] = global.terr[# _i, _j];
+            }
+        }
+        // The base plan's cells are always rock
+        for (var _k = 0; _k < array_length(_m.base_plan); _k++)
+        {
+            var _it = _m.base_plan[_k], _d2 = global.bdef[$ _it[0]];
+            for (var _slot = 0; _slot < 2; _slot++)
+            {
+                var _c = duel_plan_cell(_it, _slot);
+                for (var _i = 0; _i < _d2.w; _i++) for (var _j = 0; _j < _d2.h; _j++) global.terr[# _c[0] + _i, _c[1] + _j] = T_ROCK;
+            }
+        }
+        _ok = duel_connected(_home[0], _home[1], round(_mx), round(_my));
+    }
+    // The Orichalcum field in the middle, with its vent
+    var _cxm = round(_mx), _cym = round(_my);
+    for (var _i = _cxm - 3; _i <= _cxm + 3; _i++)
+    {
+        for (var _j = _cym - 3; _j <= _cym + 3; _j++)
+        {
+            var _dd = point_distance(_i, _j, _mx, _my);
+            if (_dd <= 2.3) global.lumen[# _i, _j] = clamp(round(LUMEN_MAX * (1 - _dd / 3.3) + 70 + random(30)), 60, LUMEN_MAX);
+        }
+    }
+    global.isvent[# _cxm, _cym] = 1;
+    global.lumen[# _cxm, _cym] = 0;
+    array_push(global.vents, [_cxm, _cym]);
+}
+
 function map_build_grids()
 {
     global.grid_veh = mp_grid_create(0, 0, global.mw, global.mh, CELL, CELL);
@@ -154,8 +286,9 @@ function map_build_grids()
 function map_build_tiles()
 {
     var _w = global.mw, _h = global.mh;
+    var _forest = global.look == "forest";
     global.lay_terrain = layer_create(10000, "Terrain");
-    global.tm_terrain = layer_tilemap_create(global.lay_terrain, -HALF, -HALF, ts_terrain, _w + 1, _h + 1);
+    global.tm_terrain = layer_tilemap_create(global.lay_terrain, -HALF, -HALF, _forest ? ts_terrain_forest : ts_terrain, _w + 1, _h + 1);
     for (var _i = 0; _i <= _w; _i++)
     {
         for (var _j = 0; _j <= _h; _j++)
@@ -171,7 +304,7 @@ function map_build_tiles()
     global.lay_lumen = layer_create(9900, "Lumen");
     global.tm_lumen = layer_tilemap_create(global.lay_lumen, 0, 0, ts_lumen, _w, _h);
     global.lay_crag = layer_create(9800, "Crags");
-    global.tm_crag = layer_tilemap_create(global.lay_crag, 0, 0, ts_crag, _w, _h);
+    global.tm_crag = layer_tilemap_create(global.lay_crag, 0, 0, _forest ? ts_crag_forest : ts_crag, _w, _h);
     for (var _i = 0; _i < _w; _i++)
     {
         for (var _j = 0; _j < _h; _j++)

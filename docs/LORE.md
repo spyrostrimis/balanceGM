@@ -34,6 +34,19 @@ back one.
   manipulation, in the manner of a covert intellectual order.
 - **Powers and technology:** not yet defined.
 
+## Sides and campaigns (how the game is structured)
+- **Blue and Red are the main playable factions**, each with a full classic campaign. Both
+  campaigns start with the same first mission, **First Claim**, seen from either side:
+  Blue's version is on a tropical forest planet, Red's on a desert planet (planets not
+  named yet).
+- **Green and the Palatinate** get mini-campaigns or single missions later.
+- The player plays **one faction per map**. The others are played by the AI.
+- **Alliances are set per map**: on a given map an AI faction (Green, the Palatinate, or
+  Blue/Red) may fight alongside either side, or against everyone. Example: in the Ashfall
+  skirmish, Green's merchants side with the player's opponent.
+- **Orichalcum** is the crystal that funds armies; whoever holds a field can pay for ships,
+  arms and soldiers. In First Claim the only field on the world is the objective.
+
 ## Political backstory
 A just and widely respected king, called **the Peacebringer**, united most of his home
 planet through diplomacy and brought the neighbouring planets of the system into an

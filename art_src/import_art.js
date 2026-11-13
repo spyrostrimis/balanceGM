@@ -15,7 +15,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(PNG, "manifest.json"), "ut
 const only = process.argv.filter((a) => a.startsWith("spr_"));
 const pick = manifest.filter((s) => !only.length || only.includes(s.name));
 // Tilesets show the sprite's image as-is (no borders), saved as output_tileset.png.
-const TILESETS = { spr_terrain: "ts_terrain", spr_lumen: "ts_lumen", spr_crag: "ts_crag" };
+const TILESETS = { spr_terrain: "ts_terrain", spr_lumen: "ts_lumen", spr_crag: "ts_crag", spr_terrain_forest: "ts_terrain_forest", spr_crag_forest: "ts_crag_forest" };
 
 if (process.argv.includes("--refresh")) {
   for (const s of pick) {

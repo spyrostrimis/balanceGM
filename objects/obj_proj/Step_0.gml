@@ -35,8 +35,8 @@ if (splash > 0)
     var _r = splash;
     var _team = team, _w = weapon, _dmg = dmg, _src = owner, _ix = x, _iy = y;
     var _victims = [];
-    with (obj_unit) if (team != _team && point_distance(x, y, _ix, _iy) <= _r + radius * 0.5) array_push(_victims, id);
-    with (obj_building) if (team != _team && bld_dist(id, _ix, _iy) <= _r * 0.5) array_push(_victims, id);
+    with (obj_unit) if (hostile(team, _team) && point_distance(x, y, _ix, _iy) <= _r + radius * 0.5) array_push(_victims, id);
+    with (obj_building) if (hostile(team, _team) && bld_dist(id, _ix, _iy) <= _r * 0.5) array_push(_victims, id);
     // A direct hit on the intended target always counts
     if (target != noone && instance_exists(target) && array_get_index(_victims, target) < 0 && target_dist(target, _ix, _iy) < 10) array_push(_victims, target);
     for (var _k2 = 0; _k2 < array_length(_victims); _k2++)

@@ -42,10 +42,18 @@ global.difficulty = 1;
 global.sound_off = false;
 global.edge_scroll = true;
 global.speed_i = 1;
-global.done = array_create(array_length(global.missions), false);
+global.done = {};
 ini_open("balance.ini");
-for (var _m = 0; _m < array_length(global.missions); _m++) global.done[_m] = ini_read_real("progress", "m" + string(_m), 0) == 1;
+for (var _m = 0; _m < array_length(global.missions); _m++)
+{
+    for (var _k = 0; _k < array_length(global.playable); _k++)
+    {
+        var _key = progress_key(_m, global.playable[_k]);
+        global.done[$ _key] = ini_read_real("progress", _key, 0) == 1;
+    }
+}
 global.player_side = ini_read_real("settings", "side", 0);
+if (array_get_index(global.playable, global.player_side) < 0) global.player_side = global.playable[0];
 global.difficulty = ini_read_real("settings", "difficulty", 1);
 ini_close();
 
@@ -105,17 +113,24 @@ global.mission = undefined;
 global.mission_index = 0;
 global.tech = 1;
 global.ai_speed = 1;
+global.look = "desert";
+global.claim = undefined;
 
 instance_create_depth(0, 0, 9000, obj_ground);
 
 var _test = environment_get_variable("BALANCE_TEST");
 global.autotest = _test != "";
-global.test_mission = global.autotest ? clamp(real(_test) - 1, 0, 2) : 0;
+global.test_mission = global.autotest ? clamp(real(_test) - 1, 0, array_length(global.missions) - 1) : 0;
+// BALANCE_TEST_SIDE=blue|red picks the side the self-test plays.
+var _test_side = side_find(string_lower(environment_get_variable("BALANCE_TEST_SIDE")));
+if (global.autotest && _test_side >= 0) global.player_side = _test_side;
 global.test_t = 0;
 global.test_shot = -1;
 global.test_dir = environment_get_variable("BALANCE_TEST_DIR");
 global.test_order = [];
 global.test_end = 0;
 global.test_pause_t = 0;
+global.test_owner = -1;
+global.result_reason = "";
 global.test_frames = global.autotest ? real("0" + environment_get_variable("BALANCE_TEST_FRAMES")) : 0;
 if (global.test_frames <= 0) global.test_frames = 24000;

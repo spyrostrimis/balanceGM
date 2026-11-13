@@ -91,9 +91,18 @@ Tools: GameMaker LTS runtime 2026.0.0.23, gm-cli 2.4.1
 (`npx @gamemaker/gm-cli compile|run|resourcetool script|manual read`).
 
 ## Where we are
-The game works (3 missions, 2 playable sides, 3 difficulties, AI that builds and attacks in
-waves). The in-game sides are Blue and Green (playable) and Red (the enemy). The missions
-and units predate the lore and don't follow it yet.
+Playable sides are **Blue and Red**: the player picks one on the title screen, the AI plays
+the other. Green and the Palatinate are defined (name, colour) for later maps.
+- **Mission 1, First Claim** (both campaigns start here): a 33×33 mirrored duel map. Blue
+  plays it on a tropical forest planet, Red on a desert planet. Each side has 3 Rifle Squads,
+  a Dune Raider and a small base (Power Core, Radar, 2 Gun Turrets, walls); no building, no
+  reinforcements. The only Orichalcum is a field in the middle inside a capture ring: 10 s
+  alone in the ring takes it, then 60 s with no enemy in the ring wins (an enemy entering
+  resets the hold). Wiping out the enemy army also wins. A zone AI gathers, pushes and holds.
+- **Skirmishes** Hold the Ridge and Ashfall (the old base-building missions with the wave
+  AI) are locked until First Claim is won with either side. They predate the lore.
+- Units, structures and the base-building rules still predate the lore. "Lumen" is the code
+  name of the resource; players see "Orichalcum".
 Don't take a feature for done because it compiles — ask the user to play it, and say
 exactly what to look for.
 
@@ -110,12 +119,24 @@ exactly what to look for.
 ## Code map
 - `scripts/scr_defs` — macros (CELL 32, GUI 1280×720, TOP_H 28, SIDE_X 1024, VIEW 512×346,
   ZOOM 2, terrain types, LUMEN_MAX 300, PLAYER 0, DEPTH_BASE 5000), `global.udef` (unit
-  stats), `global.bdef` (building stats), `dmg_mod`, sides, missions.
-- `scr_map` (generation, tilemaps, shroud, `nearest_free_cell`), `scr_units` (paths,
+  stats), `global.bdef` (building stats), `dmg_mod`, `global.sides` (blue, red, green,
+  palatinate) and `global.playable`, `side_resolve`/`side_opponent`/`by_side`, missions
+  and progress (`progress_key`, `mission_open`).
+- **Missions** never name a side by index. Each has `forces`: `side` is `"player"`,
+  `"opponent"` (the other playable side) or a side id, and `ally` groups forces that fight
+  together (per-map alliances; `hostile(a, b)` in `scr_game` compares `team.ally`). The
+  player's force is always team 0. Values that differ by side (`look`, `pic`, `brief`,
+  `speaker`) are structs keyed by side id, read with `by_side`. `layout` "duel" (mirrored
+  map + `base_plan`) or "random" (old generator + Command Yards); `rules` "claim" or
+  "destroy"; `build: false` hides the build queues.
+- `scr_map` (generation incl. `map_gen_duel`, tilemaps per `global.look` — desert or
+  forest tilesets, shroud, `nearest_free_cell`), `scr_claim` (First Claim: zone rules,
+  zone drawing on map/minimap/HUD/sidebar, the zone AI `ai_zone_step`), `scr_units` (paths,
   `unit_step`, harvester state machine, `deal_damage`), `scr_buildings` (`can_place`,
-  `place_building`, turrets, sell), `scr_production`, `scr_ai`, `scr_game` (mission flow,
-  orders, input, self-test), `scr_ui` (title, briefing, sidebar, minimap, pause/end,
-  cursor, window-size buttons), `scr_fx`, `scr_sfx` (sound made in code).
+  `place_building`, turrets, sell), `scr_production` (teams: `ally`, `home_cx/cy`),
+  `scr_ai` (the wave AI of the skirmishes), `scr_game` (mission flow, orders, input,
+  self-test), `scr_ui` (title, briefing, sidebar, minimap, pause/end, cursor,
+  window-size buttons), `scr_fx`, `scr_sfx` (sound made in code).
 - Objects: `obj_game` (Create, Step, Draw, Draw GUI, Post Draw, CleanUp), `obj_unit`,
   `obj_building`, `obj_proj`, `obj_ground`.
 - Display: the world draws into a 512×346 application surface, scaled up in Post Draw
@@ -125,10 +146,13 @@ exactly what to look for.
   filtering. Pathing: `mp_grid`, separate vehicle and infantry grids (crags block vehicles).
 
 ## Self-test
-Set `BALANCE_TEST=1|2|3` (mission) and optionally `BALANCE_TEST_FRAMES=N` before
-`gm-cli run`: the game plays that mission by itself at high speed, saves screenshots and a
-log to `%LOCALAPPDATA%\Balance`, then quits. Look at the screenshots — that's how to
-check visuals without the user.
+Set `BALANCE_TEST=1|2|3` (mission), optionally `BALANCE_TEST_SIDE=blue|red` and
+`BALANCE_TEST_FRAMES=N` before `gm-cli run`: the game plays that mission by itself at high
+speed, saves screenshots and a log to `%LOCALAPPDATA%\Balance`, then quits. In First Claim
+the player's side is played by the zone AI too. Look at the screenshots — that's how to
+check visuals without the user. The self-test doesn't save progress or settings.
+`BALANCE_TEST_ENEMY_DELAY=N` holds the opponent AI back N seconds, so the capture, hold
+and hold-reset path gets exercised (with ~45 the player takes the ring, then Red arrives).
 
 ## Art pipeline
 Art is drawn in code: `art_src/make_art.js` (terrain pixel by pixel, the rest as SVG
@@ -142,7 +166,12 @@ rendered with sharp) writes `art_src/png/<sprite>/<i>.png` + `manifest.json`.
 - `node art_src/import_art.js [spr_...] > import.txt` then
   `npx @gamemaker/gm-cli resourcetool script import.txt` — creates new sprites.
 
+Forest look: `spr_terrain_forest`/`ts_terrain_forest` (jungle floor and laterite clearings)
+and `spr_crag_forest`/`ts_crag_forest` (thickets), same tile layout as the desert sheets.
+
 ## Gotchas met so far
+- In the Bash tool, a heredoc containing an apostrophe fails to parse; write scripts to a
+  file instead.
 - Tilesets created by the resource tool had `out_columns`/`tile_count` 0 and no output
   image: set them with RESOURCE SET (borders 0) and copy the PNG to `output_tileset.png`.
 - A room's default Background layer hid the world — it was deleted.

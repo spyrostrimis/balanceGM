@@ -4,6 +4,7 @@ function team_create(_side_index, _col, _name, _is_ai, _credits)
 {
     return {
         side: _side_index, col: _col, name: _name, is_ai: _is_ai,
+        ally: 0, home_cx: 0, home_cy: 0,
         credits: _credits, shown: _credits, harvested: 0,
         power_made: 0, power_used: 0, power_low: false,
         bcount: {}, units: 0, buildings: 0, alive: true,

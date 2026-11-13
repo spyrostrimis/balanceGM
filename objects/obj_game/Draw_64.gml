@@ -14,6 +14,7 @@ switch (global.state)
         ui_drag_box();
         ui_topbar();
         ui_sidebar();
+        if (global.claim != undefined) claim_draw_hud();
         if (global.state == "end") ui_end();
         else if (global.paused) ui_pause();
         break;

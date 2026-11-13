@@ -19,6 +19,13 @@ function mission_clear()
     global.placing = "";
     global.cmd = "";
     global.teams = [];
+    claim_free();
+}
+
+/// Are teams _a and _b enemies? Teams on the same alliance (team.ally) never fight each other.
+function hostile(_a, _b)
+{
+    return global.teams[_a].ally != global.teams[_b].ally;
 }
 
 function spawn_group(_team, _types, _cx, _cy)
@@ -38,6 +45,15 @@ function spawn_group(_team, _types, _cx, _cy)
     ds_map_destroy(_avoid);
 }
 
+/// The mission's forces in team order: the player's force first (team 0), then the others.
+function mission_forces(_m)
+{
+    var _out = [];
+    for (var _k = 0; _k < array_length(_m.forces); _k++) if (_m.forces[_k].side == "player") array_push(_out, _m.forces[_k]);
+    for (var _k = 0; _k < array_length(_m.forces); _k++) if (_m.forces[_k].side != "player") array_push(_out, _m.forces[_k]);
+    return _out;
+}
+
 function mission_start(_index)
 {
     mission_clear();
@@ -51,69 +67,110 @@ function mission_start(_index)
     global.alert_y = -1;
     global.paused = false;
     global.result = "";
+    global.result_reason = "";
     global.groups = array_create(10, []);
     global.ai_speed = [0.75, 1, 1.25][global.difficulty];
     global.order_fx = [];
-    var _ps = global.player_side;
-    global.teams = [team_create(_ps, global.sides[_ps].col, global.sides[_ps].name, false, _m.credits)];
-    for (var _k = 0; _k < array_length(_m.enemies); _k++)
+    global.look = by_side(_m.look);
+
+    // One team per force. Which side each force is depends on the side the player picked.
+    var _forces = mission_forces(_m);
+    for (var _t = 0; _t < array_length(_forces); _t++)
     {
-        var _e = _m.enemies[_k];
-        var _side = (_e.side == -1) ? (1 - _ps) : _e.side;
-        var _tm = team_create(_side, global.sides[_side].col, global.sides[_side].name, true, _e.credits);
-        _tm.ai = ai_create(_e, global.difficulty);
+        var _f = _forces[_t];
+        var _side = side_resolve(_f.side);
+        var _tm = team_create(_side, global.sides[_side].col, global.sides[_side].name, _t != PLAYER, (_t == PLAYER) ? _m.credits : (_f[$ "credits"] ?? 0));
+        _tm.ally = _f.ally;
         array_push(global.teams, _tm);
     }
-    map_create(_m);
+    map_create(_m, _forces);
     global.minimap_dirty = true;
 
-    // The player's base
-    var _p = _m.player;
-    place_building(PLAYER, "yard", _p.cx, _p.cy, true);
-    shroud_reveal(_p.cx + 1, _p.cy + 1, 8);
-    spawn_group(PLAYER, _m.start_units, _p.cx + 1, _p.cy - 2);
-
-    // The enemy bases
-    for (var _k = 0; _k < array_length(_m.enemies); _k++)
+    if (_m.layout == "duel")
     {
-        var _t = _k + 1;
-        var _e2 = _m.enemies[_k];
-        place_building(_t, "yard", _e2.cx, _e2.cy, true);
-        ai_set_rally(_t);
-        teams_tally();
-        for (var _b = 0; _b < array_length(_e2.base); _b++)
+        // Mirrored bases from the plan, start units by each base, no Command Yard.
+        claim_init(_m);
+        for (var _t = 0; _t < array_length(_forces); _t++)
         {
-            ai_place(_t, _e2.base[_b], true);
+            var _f2 = _forces[_t], _tm2 = global.teams[_t];
+            var _h = duel_home(_m, _f2.slot);
+            _tm2.home_cx = _h[0];
+            _tm2.home_cy = _h[1];
+            for (var _b = 0; _b < array_length(_m.base_plan); _b++)
+            {
+                var _c = duel_plan_cell(_m.base_plan[_b], _f2.slot);
+                place_building(_t, _m.base_plan[_b][0], _c[0], _c[1], true);
+            }
             teams_tally();
+            spawn_group(_t, _f2.units, _h[0] + ((_f2.slot == 0) ? 2 : -2), _h[1] + ((_f2.slot == 0) ? -1 : 1));
+            if (_t != PLAYER) _tm2.ai = ai_zone_create(_t, global.difficulty);
         }
-        var _ai = global.teams[_t].ai;
-        spawn_group(_t, _e2.units, cell_of(_ai.rally_x), cell_of(_ai.rally_y));
+        var _z = global.claim;
+        shroud_reveal(_z.cx, _z.cy, _z.r + 1.5);
     }
+    else
+    {
+        for (var _t = 0; _t < array_length(_forces); _t++)
+        {
+            var _f3 = _forces[_t], _tm3 = global.teams[_t];
+            _tm3.home_cx = _f3.cx;
+            _tm3.home_cy = _f3.cy;
+        }
+        // The player's base
+        var _p = _forces[PLAYER];
+        place_building(PLAYER, "yard", _p.cx, _p.cy, true);
+        spawn_group(PLAYER, _p.units, _p.cx + 1, _p.cy - 2);
+        // The computer bases
+        for (var _t = 1; _t < array_length(_forces); _t++)
+        {
+            var _e2 = _forces[_t];
+            global.teams[_t].ai = ai_create(_e2, global.difficulty);
+            place_building(_t, "yard", _e2.cx, _e2.cy, true);
+            ai_set_rally(_t);
+            teams_tally();
+            for (var _b = 0; _b < array_length(_e2.base); _b++)
+            {
+                ai_place(_t, _e2.base[_b], true);
+                teams_tally();
+            }
+            var _ai = global.teams[_t].ai;
+            spawn_group(_t, _e2.units, cell_of(_ai.rally_x), cell_of(_ai.rally_y));
+        }
+    }
+    var _me = global.teams[PLAYER];
+    shroud_reveal(_me.home_cx + 1, _me.home_cy + 1, 8);
     teams_tally();
-    cam_center(_p.cx * CELL + CELL, _p.cy * CELL + CELL);
+    cam_center(_me.home_cx * CELL + CELL, _me.home_cy * CELL);
     global.state = "play";
-    msg("Mission " + string(_index + 1) + ": " + _m.title + ".  " + _m.objective);
+    msg(_m.title + ".  " + _m.objective);
 }
 
-function mission_end(_won)
+function mission_end(_won, _reason = "")
 {
+    if (global.state == "end") return;
     global.state = "end";
     global.result = _won ? "win" : "lose";
+    global.result_reason = _reason;
     global.end_t = 0;
     global.placing = "";
     play(_won ? "win" : "lose");
     if (_won)
     {
-        ini_open("balance.ini");
-        ini_write_real("progress", "m" + string(global.mission_index), 1);
-        ini_close();
-        global.done[global.mission_index] = true;
+        var _key = progress_key(global.mission_index, global.player_side);
+        if (!global.autotest)
+        {
+            ini_open("balance.ini");
+            ini_write_real("progress", _key, 1);
+            ini_close();
+        }
+        global.done[$ _key] = true;
     }
 }
 
 function check_end()
 {
     var _m = global.mission;
+    if (_m.rules == "claim") { claim_check_end(); return; }
     var _all_down = true;
     for (var _t = 1; _t < array_length(global.teams); _t++)
     {
@@ -123,12 +180,11 @@ function check_end()
             _tm.alive = false;
             msg("The " + _tm.name + " base has fallen!");
         }
-        if (_tm.alive) _all_down = false;
+        if (_tm.alive && hostile(PLAYER, _t)) _all_down = false;
     }
     var _me = global.teams[PLAYER];
-    if (_me.buildings == 0 && _me.units == 0) { mission_end(false); return; }
-    if (_m.goal == "credits" && _me.credits >= _m.goal_amount) { mission_end(true); return; }
-    if (_m.goal == "destroy" && _all_down) mission_end(true);
+    if (_me.buildings == 0 && _me.units == 0) { mission_end(false, "Your base and army are gone."); return; }
+    if (_all_down) mission_end(true, "Every enemy structure is destroyed.");
 }
 
 /// One frame of the world, apart from the units' and structures' own Step events.
@@ -139,8 +195,14 @@ function game_tick()
     for (var _t = 0; _t < array_length(global.teams); _t++)
     {
         production_step(_t);
-        if (global.teams[_t].is_ai && (global.frame + _t * 13) mod 30 == 0) ai_step(_t);
+        var _ai = global.teams[_t].ai;
+        if (global.teams[_t].is_ai && _ai != undefined && (global.frame + _t * 13) mod 30 == 0)
+        {
+            if (_ai.kind == "zone") ai_zone_step(_t); else ai_step(_t);
+        }
     }
+    if (global.claim != undefined) claim_step();
+    if (global.state != "play") return;
     if (global.frame mod 60 == 0) lumen_regrow();
     if (global.frame mod 30 == 0) check_end();
     var _me = global.teams[PLAYER];
@@ -309,8 +371,9 @@ function order_retreat(_units)
 {
     var _y = noone;
     with (obj_building) if (team == PLAYER && btype == "yard") _y = id;
-    if (_y == noone) return;
-    order_move(_units, _y.x + CELL, _y.y + 3 * CELL, "move");
+    if (_y != noone) { order_move(_units, _y.x + CELL, _y.y + 3 * CELL, "move"); return; }
+    var _me = global.teams[PLAYER];
+    order_move(_units, _me.home_cx * CELL + HALF, _me.home_cy * CELL + HALF, "move");
 }
 
 /// Right-click in the world with units selected.
@@ -318,7 +381,7 @@ function order_context(_wx, _wy)
 {
     var _h = entity_at(_wx, _wy);
     var _units = global.sel;
-    if (_h != noone && _h.team != PLAYER)
+    if (_h != noone && hostile(PLAYER, _h.team))
     {
         order_attack(_units, _h);
         play("attack");
@@ -386,10 +449,7 @@ function play_input()
     if (keyboard_check_pressed(ord("S")) && array_length(global.sel) > 0) { order_stop(global.sel); play("ack"); }
     if (keyboard_check_pressed(ord("A")) && sel_has("combat")) global.cmd = "attack";
     if (keyboard_check_pressed(ord("R")) && array_length(global.sel) > 0) { order_retreat(global.sel); play("ack"); }
-    if (keyboard_check_pressed(ord("H")))
-    {
-        with (obj_building) if (team == PLAYER && btype == "yard") cam_center(x + CELL, y + CELL);
-    }
+    if (keyboard_check_pressed(ord("H"))) cam_center(global.teams[PLAYER].home_cx * CELL + CELL, global.teams[PLAYER].home_cy * CELL);
     if (keyboard_check_pressed(vk_space) && global.alert_x >= 0) cam_center(global.alert_x, global.alert_y);
     for (var _n = 1; _n <= 9; _n++)
     {
@@ -444,7 +504,7 @@ function play_input()
         if (_in_world && mouse_check_button_pressed(mb_left))
         {
             var _h = global.hover;
-            if (_h != noone && _h.team != PLAYER) order_attack(global.sel, _h);
+            if (_h != noone && hostile(PLAYER, _h.team)) order_attack(global.sel, _h);
             else order_move(global.sel, _wx, _wy, "amove");
             play("attack");
             global.cmd = "";
@@ -575,16 +635,30 @@ function autotest_step()
 {
     global.test_t++;
     var _t = global.test_t;
-    if (_t == 10) autotest_log("tm w=" + string(tilemap_get_width(global.tm_terrain)) + " t55=" + string(tilemap_get(global.tm_terrain, 5, 5)) + " ts=" + string(tilemap_get_tileset(global.tm_terrain)) + " vis=" + string(layer_get_visible(global.lay_terrain)) + " depth=" + string(layer_get_depth(global.lay_terrain)) + " tsinfo=" + json_stringify(tileset_get_info(ts_terrain)));
+    if (_t == 10) autotest_log("side=" + global.sides[global.player_side].name + " look=" + global.look + " tm w=" + string(tilemap_get_width(global.tm_terrain)) + " t55=" + string(tilemap_get(global.tm_terrain, 5, 5)) + " ts=" + string(tilemap_get_tileset(global.tm_terrain)));
     if (_t == 1) { global.state = "brief"; global.brief_index = global.test_mission; global.brief_chars = 9999; }
-    if (_t == 3) { game_set_speed(240, gamespeed_fps); mission_start(global.test_mission); global.test_order = ["power", "refinery", "barracks", "power", "factory", "gun", "gun", "radar", "power", "rocket"]; }
+    if (_t == 3)
+    {
+        game_set_speed(240, gamespeed_fps);
+        mission_start(global.test_mission);
+        global.test_order = ["power", "refinery", "barracks", "power", "factory", "gun", "gun", "radar", "power", "rocket"];
+        // In First Claim the player's side is played by the same AI as the opponent.
+        if (global.mission.rules == "claim")
+        {
+            global.teams[PLAYER].ai = ai_zone_create(PLAYER, 1);
+            // BALANCE_TEST_ENEMY_DELAY=N keeps the opponent's AI still for N seconds (tests capture and hold).
+            var _delay = environment_get_variable("BALANCE_TEST_ENEMY_DELAY");
+            if (_delay != "") for (var _k = 1; _k < array_length(global.teams); _k++) global.teams[_k].ai.start = real(_delay) * 60;
+        }
+    }
     if (global.state != "play" && global.state != "end") return;
     if (global.state == "end")
     {
-        if (global.test_shot > -2) { autotest_log("END " + global.result); global.test_shot = -2; global.test_end = global.test_t; }
+        if (global.test_shot > -2) { autotest_log("END " + global.result + " (" + global.result_reason + ")"); global.test_shot = -2; global.test_end = global.test_t; }
         if (global.test_t > global.test_end + 5) game_end();
         return;
     }
+    if (global.mission.rules == "claim") { autotest_claim(); return; }
     var _tm = global.teams[PLAYER];
     _tm.credits += 0.4; // a little help so the test reaches the late game
     var _qb = _tm.q_bld;
@@ -631,8 +705,8 @@ function autotest_step()
     {
         var _army = [];
         with (obj_unit) if (team == PLAYER && utype != "harvester") { array_push(_army, id); ai_role = "test"; }
-        var _e = global.mission.enemies[0];
-        if (array_length(_army) > 0) order_move(_army, _e.cx * CELL, _e.cy * CELL, "amove");
+        var _e = global.teams[1];
+        if (array_length(_army) > 0) order_move(_army, _e.home_cx * CELL, _e.home_cy * CELL, "amove");
         autotest_log("attack with " + string(array_length(_army)));
     }
     if (global.frame mod 600 == 300)
@@ -649,12 +723,49 @@ function autotest_step()
         var _ax = 0, _ay = 0, _an = 0;
         with (obj_unit) if (team == PLAYER && utype != "harvester" && ai_role == "test") { _ax += x; _ay += y; _an++; }
         if (_i mod 2 == 1 && _an > 0) cam_center(_ax / _an, _ay / _an);
-        else cam_center(global.mission.player.cx * CELL + CELL, global.mission.player.cy * CELL);
+        else cam_center(global.teams[PLAYER].home_cx * CELL + CELL, global.teams[PLAYER].home_cy * CELL);
         global.test_shot = global.frame + 2;
         global.tab = _i mod 3;
         if (_i >= 2) with (obj_unit) if (team == PLAYER) { global.sel = [id]; selected = true; break; }
     }
     if (global.frame >= global.test_frames) { autotest_log("TIMEOUT"); game_end(); }
+}
+
+/// The self-test for First Claim: both sides play the zone AI; the test also pokes at the controls
+/// and takes screenshots of the base, the ring and the end.
+function autotest_claim()
+{
+    var _f = global.frame;
+    if ((_f + 7) mod 30 == 0) ai_zone_step(PLAYER);
+    var _z = global.claim;
+    if (_f mod 300 == 0)
+    {
+        var _s = "";
+        for (var _k = 0; _k < array_length(global.teams); _k++) _s += global.teams[_k].name + " units=" + string(global.teams[_k].units) + " bld=" + string(global.teams[_k].buildings) + " | ";
+        autotest_log(_s + "owner=" + string(_z.owner) + " cap=" + string(_z.cap_ally) + ":" + string(_z.cap_t) + " hold=" + string(_z.hold_t) + " contested=" + string(_z.contested) + " in=" + json_stringify(_z.counts) + " fps=" + string(fps_real));
+    }
+    // Exercise the player's controls and screens
+    var _me = global.teams[PLAYER];
+    if (_f == 200) { select_box(_me.home_cx * CELL - 200, _me.home_cy * CELL - 200, _me.home_cx * CELL + 200, _me.home_cy * CELL + 200, false); autotest_log("box " + string(array_length(global.sel))); }
+    if (_f == 210) global.cmd = "attack";
+    if (_f == 220) { global.cmd = ""; var _en = noone; with (obj_building) if (team != PLAYER) _en = id; if (_en != noone) { global.sel_one = _en; sel_set([]); } }
+    if (_f == 230) { var _ob = noone; with (obj_building) if (team == PLAYER && btype == "gun") _ob = id; if (_ob != noone) global.sel_one = _ob; }
+    if (_f == 240) { order_retreat([]); global.groups[1] = []; }
+    if (_f == 400 && global.test_pause_t == 0) { global.paused = true; global.test_pause_t = global.test_t; autotest_log("paused"); }
+    if (global.paused && global.test_t > global.test_pause_t + 20) { global.paused = false; autotest_log("resumed"); }
+    // Screenshots: the base at the start, then the ring whenever something changes, and every 20 s
+    var _shot = (_f == 60) || (_f > 0 && _f mod 1200 == 600);
+    if (_z.owner != global.test_owner) { global.test_owner = _z.owner; _shot = true; autotest_log("owner now " + string(_z.owner)); }
+    if (_shot && global.test_shot < _f)
+    {
+        if (_f == 60) cam_center(_me.home_cx * CELL + 3 * CELL, _me.home_cy * CELL - 2 * CELL);
+        else cam_center(_z.x, _z.y);
+        global.test_shot = _f + 2;
+        var _one = noone;
+        with (obj_unit) if (team == PLAYER) { _one = id; break; }
+        if (_one != noone) sel_set([_one]);
+    }
+    if (_f >= global.test_frames) { autotest_log("TIMEOUT"); game_end(); }
 }
 
 /// Draws the whole frame (world and GUI) into a surface and saves it; called from Draw GUI on test frames.
@@ -666,6 +777,7 @@ function autotest_capture(_name)
     draw_surface_ext(application_surface, 0, TOP_H, ZOOM, ZOOM, 0, c_white, 1);
     ui_topbar();
     ui_sidebar();
+    if (global.claim != undefined) claim_draw_hud();
     if (global.state == "end") { global.end_t = 200; ui_end(); }
     surface_reset_target();
     surface_save(_s, global.test_dir + _name);

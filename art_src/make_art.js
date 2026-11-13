@@ -58,6 +58,7 @@ const DEFS = `
 <radialGradient id="metalDome" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#f2eee4"/><stop offset="0.5" stop-color="#a9a497"/><stop offset="1" stop-color="#4a4740"/></radialGradient>
 <linearGradient id="cyl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#55524b"/><stop offset="0.35" stop-color="#c9c4b6"/><stop offset="1" stop-color="#4a4740"/></linearGradient>
 <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1d3f"/><stop offset="0.45" stop-color="#8a3f4f"/><stop offset="0.75" stop-color="#e2804a"/><stop offset="1" stop-color="#f7c27a"/></linearGradient>
+<linearGradient id="jungleSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c2230"/><stop offset="0.5" stop-color="#245a52"/><stop offset="1" stop-color="#8fc88a"/></linearGradient>
 <linearGradient id="cameoBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a40"/><stop offset="0.55" stop-color="#9a5a48"/><stop offset="0.56" stop-color="#c88a52"/><stop offset="1" stop-color="#7a4e2c"/></linearGradient>
 `;
 
@@ -81,7 +82,7 @@ function tileNoise(seed, cells) {
 const edgeN1 = tileNoise(11, 4), edgeN2 = tileNoise(12, 8), shadeN = tileNoise(13, 4), rippleN = tileNoise(14, 2);
 const edgeNoise = (x, y) => (edgeN1(x, y) - 0.5) * 0.22 + (edgeN2(x, y) - 0.5) * 0.12;
 
-function terrainTile(mask, seed) {
+function terrainTile(mask, seed, look = "desert") {
   const R = 9; // corner rounding radius in pixels
   const corner = (x, y) => { // which cell owns point (x, y) in this tile's 4-cell neighbourhood
     const right = x >= 16, bottom = y >= 16;
@@ -108,7 +109,8 @@ function terrainTile(mask, seed) {
     const dfdx = F(x + 1, y) - F(x - 1, y);
     const sh = shadeN(x + 0.5, y + 0.5) - 0.5;
     let c;
-    if (f >= 0.5) {
+    if (look === "forest") c = forestPixel(x, y, f, dfdx, dfdy, sh, r());
+    else if (f >= 0.5) {
       // rock: dark granular stone
       const g = r();
       c = [96, 84, 76];
@@ -139,19 +141,53 @@ function terrainTile(mask, seed) {
   }
   return buf;
 }
-{
+// Forest look (the tropical planet): jungle floor for open ground, red laterite clearings for
+// buildable ground. Same tile layout as the desert sheet.
+const patchN = tileNoise(15, 4), litterN = tileNoise(16, 8);
+function forestPixel(x, y, f, dfdx, dfdy, sh, g) {
+  let c;
+  if (f >= 0.5) {
+    // laterite: packed red earth, granular
+    c = [176, 98, 58];
+    if (g < 0.16) c = [150, 82, 48]; else if (g > 0.9) c = [198, 122, 76];
+    c = c.map((v) => v + sh * 24);
+    if (f < 0.58) { // a grassy lip, lit from the top left
+      const lit = -(dfdx + dfdy);
+      c = lit > 0 ? [124, 190, 72] : [92, 56, 36];
+    }
+  } else {
+    // jungle floor: saturated grass in patches, blades, leaf litter and the odd flower
+    const p = patchN(x + 0.5, y + 0.5);
+    c = p > 0.58 ? [62, 150, 56] : (p < 0.38 ? [86, 172, 62] : [72, 160, 58]);
+    const blade = ((x * 5 + Math.floor((y + (x % 3)) / 3) * 11) % 7) === 0;
+    if (blade) c = c.map((v, i) => v + [-18, -26, -14][i]);
+    if (litterN(x + 0.5, y + 0.5) > 0.72 && g < 0.4) c = [118, 128, 50];
+    if (g > 0.985) c = [250, 226, 92]; else if (g > 0.978) c = [236, 96, 128]; else if (g > 0.93) c = [110, 200, 84];
+    c = c.map((v) => v + sh * 18);
+    if (f > 0.3 && dfdy < -0.002) { // earth bank below a clearing's edge
+      const k = Math.min(1, (f - 0.3) / 0.2);
+      c = c.map((v, i) => v * (1 - k) + [96, 58, 36][i] * k);
+    } else if (f > 0.36) {
+      c = c.map((v) => v * 0.8);
+    }
+  }
+  return c;
+}
+function terrainSheet(name, look) {
   const tiles = [Buffer.alloc(32 * 32 * 4)];
-  for (let m = 0; m < 16; m++) tiles.push(terrainTile(m, 1));
-  for (let v = 0; v < 3; v++) tiles.push(terrainTile(0, 2 + v));
-  for (let v = 0; v < 3; v++) tiles.push(terrainTile(15, 2 + v));
+  for (let m = 0; m < 16; m++) tiles.push(terrainTile(m, 1, look));
+  for (let v = 0; v < 3; v++) tiles.push(terrainTile(0, 2 + v, look));
+  for (let v = 0; v < 3; v++) tiles.push(terrainTile(15, 2 + v, look));
   while (tiles.length < 24) tiles.push(Buffer.alloc(32 * 32 * 4));
   const W = 8 * 32, H = 3 * 32, sheet = Buffer.alloc(W * H * 4);
   tiles.forEach((t, i) => {
     const ox = (i % 8) * 32, oy = Math.floor(i / 8) * 32;
     for (let y = 0; y < 32; y++) t.copy(sheet, ((oy + y) * W + ox) * 4, y * 128, y * 128 + 128);
   });
-  sprite("spr_terrain", [{ raw: sheet }], W, H, 0, 0);
+  sprite(name, [{ raw: sheet }], W, H, 0, 0);
 }
+terrainSheet("spr_terrain", "desert");
+terrainSheet("spr_terrain_forest", "forest");
 
 // ---------- Lumen crystal fields (tileset: 0 empty, 1-2 thin, 3-4 medium, 5-6 rich, 7 vent) ----------
 function shard(x, y, len, ang, wdt) {
@@ -203,6 +239,39 @@ function crag(seed) {
   return s;
 }
 sprite("spr_crag", [["", crag(1), crag(2), crag(3), crag(4)].map((c, i) => `<g transform="translate(${i * 32},0)">${c}</g>`).join("")], 160, 32, 0, 0);
+
+// ---------- Jungle thickets (the forest look's crags: dense trees vehicles can't get through) ----------
+function thicket(seed) {
+  const r = rng(seed + 300);
+  let s = `<ellipse cx="17" cy="19" rx="15.5" ry="13.5" fill="#06240c" opacity="0.45"/>`;
+  const clumps = [];
+  for (let i = 0; i < 6; i++) clumps.push([6 + r() * 20, 6 + r() * 20, 6 + r() * 4]);
+  clumps.push([16, 16, 9]);
+  clumps.sort((a, b) => a[1] - b[1]);
+  for (const [x, y, rad] of clumps) {
+    let pts = [];
+    const k = 9;
+    for (let j = 0; j < k; j++) {
+      const a = (j / k) * Math.PI * 2, rr = rad * (j % 2 ? 0.82 : 1) * (0.9 + r() * 0.15);
+      pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]);
+    }
+    const P = pts.map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" ");
+    s += `<polygon points="${P}" fill="#1d6b2a" stroke="#0a2a10" stroke-width="0.9" stroke-linejoin="round"/>`;
+    s += `<circle cx="${(x - rad * 0.22).toFixed(1)}" cy="${(y - rad * 0.25).toFixed(1)}" r="${(rad * 0.62).toFixed(1)}" fill="#33922f"/>`;
+    s += `<circle cx="${(x - rad * 0.36).toFixed(1)}" cy="${(y - rad * 0.4).toFixed(1)}" r="${(rad * 0.28).toFixed(1)}" fill="#6cc84a"/>`;
+  }
+  if (seed % 2 === 0) { // a palm crown poking through
+    const cx = 10 + r() * 12, cy = 9 + r() * 12;
+    for (let j = 0; j < 7; j++) {
+      const a = (j / 7) * Math.PI * 2 + r() * 0.3;
+      s += `<path d="M${cx} ${cy} Q${(cx + Math.cos(a + 0.4) * 6).toFixed(1)} ${(cy + Math.sin(a + 0.4) * 6).toFixed(1)} ${(cx + Math.cos(a) * 11).toFixed(1)} ${(cy + Math.sin(a) * 11).toFixed(1)}" stroke="#0e3d14" stroke-width="3.2" fill="none" stroke-linecap="round"/>`;
+      s += `<path d="M${cx} ${cy} Q${(cx + Math.cos(a + 0.4) * 6).toFixed(1)} ${(cy + Math.sin(a + 0.4) * 6).toFixed(1)} ${(cx + Math.cos(a) * 10).toFixed(1)} ${(cy + Math.sin(a) * 10).toFixed(1)}" stroke="#58b83c" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+    }
+    s += `<circle cx="${cx}" cy="${cy}" r="1.8" fill="#6a4a22"/>`;
+  }
+  return s;
+}
+sprite("spr_crag_forest", [["", thicket(1), thicket(2), thicket(3), thicket(4)].map((c, i) => `<g transform="translate(${i * 32},0)">${c}</g>`).join("")], 160, 32, 0, 0);
 
 // ---------- Units (32 rotations, facing right at frame 0, counter-clockwise like GameMaker) ----------
 const tracks = (x, y, w, h) => {
@@ -539,7 +608,35 @@ const scene3 = `<rect width="480" height="270" fill="#2a1416"/><rect width="480"
   ${towerSil(100, 200, 1, "#140c0c")}${towerSil(380, 196, 1.2, "#140c0c")}
   <circle cx="240" cy="190" r="40" fill="url(#glowY)"/><circle cx="300" cy="170" r="24" fill="url(#glowY)"/>
   ${dunes(480, 270, 200, ["#3a2420", "#5a3426"], 9)}${tankSil(200, 240, 1.3, "#0c0808")}`;
-sprite("spr_mission_pic", [scene1, scene2, scene3], 480, 270, 0, 0);
+// First Claim: one picture for each look (frame 0 forest, frame 1 desert).
+function canopy(w, h, top, cols, seed) {
+  const r = rng(seed);
+  let s = "";
+  cols.forEach((c, i) => {
+    const y0 = top + i * 26;
+    for (let x = -20; x < w + 30; x += 18 + r() * 14) s += `<circle cx="${x.toFixed(1)}" cy="${(y0 + r() * 16).toFixed(1)}" r="${(16 + r() * 14).toFixed(1)}" fill="${c}"/>`;
+    s += `<rect x="0" y="${y0 + 8}" width="${w}" height="${h - y0}" fill="${c}"/>`;
+  });
+  return s;
+}
+const crystals = (x, y, k) => `<ellipse cx="${x}" cy="${y}" rx="${60 * k}" ry="${16 * k}" fill="url(#glowC)" opacity="0.8"/>` +
+  [[-26, 2, 18, -70], [-8, -2, 28, -92], [10, 0, 22, -60], [26, 4, 14, -110], [0, 6, 16, -130]].map(([dx, dy, l, a]) => shard(x + dx * k, y + dy * k, l * k, a, 3.4 * k)).join("");
+const banner = (x, y, col) => `<rect x="${x}" y="${y - 70}" width="3" height="70" fill="#1a1612"/><polygon points="${x + 3},${y - 70} ${x + 40},${y - 62} ${x + 3},${y - 50}" fill="${col}" stroke="#1a1612" stroke-width="1.5"/>`;
+const claimForest = `<rect width="480" height="270" fill="url(#jungleSky)"/>
+  ${Array.from({ length: 24 }, (_, i) => { const r = rng(700 + i); return `<circle cx="${r() * 480}" cy="${r() * 90}" r="${0.5 + r()}" fill="#fff" opacity="${0.3 + r() * 0.5}"/>`; }).join("")}
+  <circle cx="380" cy="64" r="26" fill="#d8f0c8" opacity="0.85"/><circle cx="390" cy="58" r="26" fill="#2f6a5a" opacity="0.35"/>
+  ${canopy(480, 270, 110, ["#0f3a22", "#14502a", "#1c6a30"], 31)}
+  <ellipse cx="240" cy="236" rx="170" ry="40" fill="#a85a34"/><ellipse cx="240" cy="232" rx="150" ry="30" fill="#c06c3e"/>
+  ${crystals(240, 226, 1.1)}
+  ${banner(110, 236, "#4684ec")}${banner(360, 236, "#d63c30")}
+  ${canopy(480, 290, 250, ["#0a2a16"], 37)}`;
+const claimDesert = `<rect width="480" height="270" fill="url(#sky)"/>${ringPlanet(370, 62, 30)}
+  <path d="M0 270 L0 140 L70 120 L150 150 L200 210 L0 270 Z" fill="#4a3c34"/>
+  <path d="M480 270 L480 130 L410 116 L330 150 L280 210 L480 270 Z" fill="#4a3c34"/>
+  ${dunes(480, 270, 196, ["#c27a4a", "#d8955a"], 5)}
+  ${crystals(240, 226, 1.1)}
+  ${banner(110, 236, "#4684ec")}${banner(360, 236, "#d63c30")}`;
+sprite("spr_mission_pic", [claimForest, claimDesert, scene2, scene3], 480, 270, 0, 0);
 const title = `<rect width="1280" height="720" fill="url(#sky)"/>
   ${Array.from({ length: 60 }, (_, i) => { const r = rng(500 + i); return `<circle cx="${r() * 1280}" cy="${r() * 260}" r="${0.6 + r() * 1.4}" fill="#fff" opacity="${0.3 + r() * 0.6}"/>`; }).join("")}
   ${ringPlanet(980, 170, 90)}
